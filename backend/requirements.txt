@@ -1,0 +1,5 @@
+fastapi==0.115.0
+uvicorn[standard]==0.30.6
+instaloader==4.15.1
+python-multipart==0.0.9
+aiofiles==24.1.0
