@@ -1,18 +1,45 @@
-import { useState, useEffect } from 'react'
-import { fetchRecipe, deleteRecipe, mediaUrl } from '../api.js'
+import { useState, useEffect, useRef } from 'react'
+import { fetchRecipe, deleteRecipe, fetchLabels, setRecipeLabels, mediaUrl } from '../api.js'
 import './RecipeDetail.css'
 
 export default function RecipeDetail({ id, onBack }) {
   const [recipe, setRecipe] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [allLabels, setAllLabels] = useState([])
+  const [recipeLabels, setRecipeLabelsState] = useState([])
+  const [showPicker, setShowPicker] = useState(false)
+  const pickerRef = useRef(null)
 
   useEffect(() => {
     fetchRecipe(id)
-      .then(setRecipe)
+      .then(r => { setRecipe(r); setRecipeLabelsState(r.labels || []) })
       .catch(e => setError(e.message))
       .finally(() => setLoading(false))
+    fetchLabels().then(setAllLabels).catch(() => {})
   }, [id])
+
+  useEffect(() => {
+    if (!showPicker) return
+    function handleClick(e) {
+      if (pickerRef.current && !pickerRef.current.contains(e.target)) setShowPicker(false)
+    }
+    document.addEventListener('mousedown', handleClick)
+    return () => document.removeEventListener('mousedown', handleClick)
+  }, [showPicker])
+
+  async function handleRemoveLabel(labelId) {
+    const newIds = recipeLabels.filter(l => l.id !== labelId).map(l => l.id)
+    const updated = await setRecipeLabels(id, newIds)
+    setRecipeLabelsState(updated)
+  }
+
+  async function handleAddLabel(label) {
+    const newIds = [...recipeLabels.map(l => l.id), label.id]
+    const updated = await setRecipeLabels(id, newIds)
+    setRecipeLabelsState(updated)
+    setShowPicker(false)
+  }
 
   async function handleDelete() {
     if (!confirm('Remove this recipe from your vault?')) return
@@ -36,7 +63,6 @@ export default function RecipeDetail({ id, onBack }) {
 
   function formatCaption(caption) {
     if (!caption) return []
-    // Split into paragraphs on double newlines, or every ~3 single newlines
     return caption.split(/\n{2,}/).map(p => p.trim()).filter(Boolean)
   }
 
@@ -58,6 +84,7 @@ export default function RecipeDetail({ id, onBack }) {
   const paragraphs = formatCaption(recipe.caption)
   const videoSrc = mediaUrl(recipe.video_path)
   const thumbSrc = mediaUrl(recipe.thumbnail_path)
+  const unassigned = allLabels.filter(l => !recipeLabels.find(rl => rl.id === l.id))
 
   return (
     <div className="detail-page">
@@ -77,7 +104,6 @@ export default function RecipeDetail({ id, onBack }) {
       </div>
 
       <div className="detail-inner">
-        {/* Media */}
         <div className="detail-media">
           {videoSrc ? (
             <video
@@ -94,11 +120,52 @@ export default function RecipeDetail({ id, onBack }) {
           )}
         </div>
 
-        {/* Info */}
         <div className="detail-info">
           <p className="detail-author">@{recipe.author}</p>
           <h1 className="detail-title">{recipe.title}</h1>
           <p className="detail-date">{formatDate(recipe.post_date)}</p>
+
+          {/* User labels */}
+          <div className="detail-labels-section">
+            <div className="detail-labels">
+              {recipeLabels.map(l => (
+                <span key={l.id} className="detail-label-chip">
+                  {l.name}
+                  <button
+                    className="label-chip-remove"
+                    onClick={() => handleRemoveLabel(l.id)}
+                    title="Remove label"
+                  >×</button>
+                </span>
+              ))}
+              {allLabels.length > 0 && unassigned.length > 0 && (
+                <div className="label-add-wrapper" ref={pickerRef}>
+                  <button
+                    className="label-add-btn"
+                    onClick={() => setShowPicker(v => !v)}
+                  >
+                    + Add
+                  </button>
+                  {showPicker && (
+                    <div className="label-picker">
+                      {unassigned.map(l => (
+                        <button
+                          key={l.id}
+                          className="label-picker-item"
+                          onClick={() => handleAddLabel(l)}
+                        >
+                          {l.name}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+              {allLabels.length === 0 && (
+                <span className="labels-hint">Create labels from the vault to organise recipes.</span>
+              )}
+            </div>
+          </div>
 
           {tags.length > 0 && (
             <div className="detail-tags">

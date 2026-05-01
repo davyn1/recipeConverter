@@ -2,6 +2,7 @@ from fastapi import FastAPI, HTTPException, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
+from typing import Optional, List
 import sqlite3
 import os
 import json
@@ -26,6 +27,7 @@ os.makedirs(MEDIA_DIR, exist_ok=True)
 def get_db():
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA foreign_keys = ON")
     return conn
 
 
@@ -67,9 +69,42 @@ def init_db():
             INSERT INTO recipes_fts(recipes_fts, rowid, title, caption, author, tags)
             VALUES ('delete', old.id, old.title, old.caption, old.author, old.tags);
         END;
+
+        CREATE TABLE IF NOT EXISTS labels (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT UNIQUE NOT NULL,
+            created_at TEXT DEFAULT (datetime('now'))
+        );
+
+        CREATE TABLE IF NOT EXISTS recipe_labels (
+            recipe_id INTEGER NOT NULL REFERENCES recipes(id) ON DELETE CASCADE,
+            label_id INTEGER NOT NULL REFERENCES labels(id) ON DELETE CASCADE,
+            PRIMARY KEY (recipe_id, label_id)
+        );
     """)
     conn.commit()
     conn.close()
+
+
+def attach_labels(conn, recipes: list) -> list:
+    if not recipes:
+        return recipes
+    ids = [r["id"] for r in recipes]
+    placeholders = ",".join("?" * len(ids))
+    rows = conn.execute(
+        f"""SELECT rl.recipe_id, l.id, l.name
+            FROM recipe_labels rl
+            JOIN labels l ON l.id = rl.label_id
+            WHERE rl.recipe_id IN ({placeholders})
+            ORDER BY l.name""",
+        ids,
+    ).fetchall()
+    label_map: dict = {}
+    for row in rows:
+        label_map.setdefault(row["recipe_id"], []).append({"id": row["id"], "name": row["name"]})
+    for r in recipes:
+        r["labels"] = label_map.get(r["id"], [])
+    return recipes
 
 
 init_db()
@@ -83,6 +118,14 @@ class RecipeStatus(BaseModel):
     id: int
     status: str
     message: str
+
+
+class CreateLabelRequest(BaseModel):
+    name: str
+
+
+class SetRecipeLabelsRequest(BaseModel):
+    label_ids: List[int]
 
 
 @app.post("/api/recipes")
@@ -149,31 +192,36 @@ def process_recipe(recipe_id: int, url: str):
 
 
 @app.get("/api/recipes")
-def list_recipes(search: str = "", limit: int = 50, offset: int = 0):
-    """List all recipes, with optional full-text search."""
+def list_recipes(search: str = "", label_id: Optional[int] = None, limit: int = 50, offset: int = 0):
     conn = get_db()
     try:
+        params: list = []
+        joins = ""
+        wheres: list = []
+
         if search.strip():
-            rows = conn.execute("""
-                SELECT r.* FROM recipes r
-                JOIN recipes_fts fts ON r.id = fts.rowid
-                WHERE recipes_fts MATCH ?
-                ORDER BY r.created_at DESC
-                LIMIT ? OFFSET ?
-            """, (search, limit, offset)).fetchall()
-        else:
-            rows = conn.execute(
-                "SELECT * FROM recipes ORDER BY created_at DESC LIMIT ? OFFSET ?",
-                (limit, offset)
-            ).fetchall()
-        return [dict(row) for row in rows]
+            joins += " JOIN recipes_fts fts ON r.id = fts.rowid"
+            wheres.append("recipes_fts MATCH ?")
+            params.append(search)
+
+        if label_id is not None:
+            joins += " JOIN recipe_labels rl ON r.id = rl.recipe_id"
+            wheres.append("rl.label_id = ?")
+            params.append(label_id)
+
+        where = f"WHERE {' AND '.join(wheres)}" if wheres else ""
+        query = f"SELECT r.* FROM recipes r{joins} {where} ORDER BY r.created_at DESC LIMIT ? OFFSET ?"
+        params += [limit, offset]
+
+        rows = conn.execute(query, params).fetchall()
+        recipes = [dict(row) for row in rows]
+        return attach_labels(conn, recipes)
     finally:
         conn.close()
 
 
 @app.get("/api/recipes/{recipe_id}")
 def get_recipe(recipe_id: int):
-    """Get a single recipe by ID."""
     conn = get_db()
     try:
         row = conn.execute(
@@ -181,7 +229,9 @@ def get_recipe(recipe_id: int):
         ).fetchone()
         if not row:
             raise HTTPException(status_code=404, detail="Recipe not found")
-        return dict(row)
+        recipe = dict(row)
+        attach_labels(conn, [recipe])
+        return recipe
     finally:
         conn.close()
 
@@ -194,6 +244,67 @@ def delete_recipe(recipe_id: int):
         conn.execute("DELETE FROM recipes WHERE id = ?", (recipe_id,))
         conn.commit()
         return {"status": "deleted"}
+    finally:
+        conn.close()
+
+
+@app.get("/api/labels")
+def list_labels():
+    conn = get_db()
+    try:
+        rows = conn.execute("SELECT id, name FROM labels ORDER BY name").fetchall()
+        return [dict(row) for row in rows]
+    finally:
+        conn.close()
+
+
+@app.post("/api/labels", status_code=201)
+def create_label(req: CreateLabelRequest):
+    name = req.name.strip()
+    if not name:
+        raise HTTPException(status_code=400, detail="Label name cannot be empty")
+    conn = get_db()
+    try:
+        cursor = conn.execute("INSERT INTO labels (name) VALUES (?)", (name,))
+        conn.commit()
+        return {"id": cursor.lastrowid, "name": name}
+    except sqlite3.IntegrityError:
+        raise HTTPException(status_code=409, detail="Label already exists")
+    finally:
+        conn.close()
+
+
+@app.delete("/api/labels/{label_id}")
+def delete_label(label_id: int):
+    conn = get_db()
+    try:
+        conn.execute("DELETE FROM labels WHERE id = ?", (label_id,))
+        conn.commit()
+        return {"status": "deleted"}
+    finally:
+        conn.close()
+
+
+@app.put("/api/recipes/{recipe_id}/labels")
+def set_recipe_labels(recipe_id: int, req: SetRecipeLabelsRequest):
+    conn = get_db()
+    try:
+        if not conn.execute("SELECT id FROM recipes WHERE id = ?", (recipe_id,)).fetchone():
+            raise HTTPException(status_code=404, detail="Recipe not found")
+        conn.execute("DELETE FROM recipe_labels WHERE recipe_id = ?", (recipe_id,))
+        for lid in req.label_ids:
+            conn.execute(
+                "INSERT OR IGNORE INTO recipe_labels (recipe_id, label_id) VALUES (?, ?)",
+                (recipe_id, lid),
+            )
+        conn.commit()
+        rows = conn.execute(
+            """SELECT l.id, l.name FROM labels l
+               JOIN recipe_labels rl ON l.id = rl.label_id
+               WHERE rl.recipe_id = ? ORDER BY l.name""",
+            (recipe_id,),
+        ).fetchall()
+        return [dict(row) for row in rows]
     finally:
         conn.close()
 
