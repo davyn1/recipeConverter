@@ -13,6 +13,7 @@ Save Instagram recipe posts and reels locally — browse, search, and rewatch th
 - **Video download** — Downloads up to 1080p via yt-dlp, falls back to 720p via instaloader
 - **Thumbnail preview** — Cover image pulled automatically from the post
 - **Recipe grid** — Browse all saved recipes with author, title, and date
+- **Recipe detail** — Full caption and video playback for each saved recipe
 - **Full-text search** — Search by title, caption, ingredients, or hashtags
 - **Background processing** — Recipes process in the background while you keep using the app
 - **Local storage** — Everything stored locally via SQLite, no cloud required
@@ -46,7 +47,6 @@ Then open [http://localhost:5173](http://localhost:5173) in your browser.
 
 ## Planned Features
 
-- [ ] Recipe detail page with full caption and video playback
 - [ ] Tag/hashtag filtering
 - [ ] Delete recipes from the grid
 - [ ] Support for private posts via Instagram login session
