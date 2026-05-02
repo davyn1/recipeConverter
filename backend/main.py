@@ -1,12 +1,14 @@
-from fastapi import FastAPI, HTTPException, BackgroundTasks
+from fastapi import FastAPI, HTTPException, BackgroundTasks, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from typing import Optional, List
+from pathlib import Path
+import mimetypes
+import re
 import sqlite3
 import os
 import json
-from datetime import datetime
 from downloader import extract_post_data
 
 app = FastAPI(title="RecipeVault API")
@@ -396,10 +398,63 @@ def set_recipe_labels(recipe_id: int, req: SetRecipeLabelsRequest):
         conn.close()
 
 
-# --- Static files & health ---
+# --- Media serving & health ---
 
-# Serve downloaded videos and thumbnails from the media directory
-app.mount("/media", StaticFiles(directory=MEDIA_DIR), name="media")
+@app.get("/media/{filepath:path}")
+async def serve_media(filepath: str, request: Request):
+    """Serve media files as a proper FastAPI route so CORS middleware applies.
+    Handles Range requests explicitly to support video seeking in the browser."""
+    file_path = Path(MEDIA_DIR) / filepath
+    if not file_path.exists() or not file_path.is_file():
+        raise HTTPException(status_code=404)
+
+    file_size = file_path.stat().st_size
+    content_type = mimetypes.guess_type(str(file_path))[0] or "application/octet-stream"
+
+    range_header = request.headers.get("range")
+    if range_header:
+        match = re.match(r"bytes=(\d+)-(\d*)", range_header)
+        if match:
+            start = int(match.group(1))
+            end = int(match.group(2)) if match.group(2) else file_size - 1
+            end = min(end, file_size - 1)
+            length = end - start + 1
+
+            def iter_chunk():
+                with open(file_path, "rb") as f:
+                    f.seek(start)
+                    remaining = length
+                    while remaining > 0:
+                        data = f.read(min(65536, remaining))
+                        if not data:
+                            break
+                        remaining -= len(data)
+                        yield data
+
+            return StreamingResponse(
+                iter_chunk(),
+                status_code=206,
+                media_type=content_type,
+                headers={
+                    "Content-Range": f"bytes {start}-{end}/{file_size}",
+                    "Accept-Ranges": "bytes",
+                    "Content-Length": str(length),
+                },
+            )
+
+    def iter_file():
+        with open(file_path, "rb") as f:
+            while chunk := f.read(65536):
+                yield chunk
+
+    return StreamingResponse(
+        iter_file(),
+        media_type=content_type,
+        headers={
+            "Accept-Ranges": "bytes",
+            "Content-Length": str(file_size),
+        },
+    )
 
 
 @app.get("/api/health")
