@@ -75,15 +75,6 @@ def init_db():
             VALUES ('delete', old.id, old.title, old.caption, old.author, old.tags);
         END;
 
-        -- FTS5 content tables require a delete-then-insert to update a row
-        CREATE TRIGGER IF NOT EXISTS recipes_au
-        AFTER UPDATE ON recipes BEGIN
-            INSERT INTO recipes_fts(recipes_fts, rowid, title, caption, author, tags)
-            VALUES ('delete', old.id, old.title, old.caption, old.author, old.tags);
-            INSERT INTO recipes_fts(rowid, title, caption, author, tags)
-            VALUES (new.id, new.title, new.caption, new.author, new.tags);
-        END;
-
         -- User-defined labels (e.g. "Asian", "Quick Meals") — separate from Instagram hashtags
         CREATE TABLE IF NOT EXISTS labels (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -297,7 +288,8 @@ def get_recipe_status(recipe_id: int):
 @app.put("/api/recipes/{recipe_id}/tags")
 def update_recipe_tags(recipe_id: int, req: UpdateTagsRequest):
     """Replace the hashtag list for a recipe. Used when the user removes individual
-    Instagram hashtags they don't want to keep."""
+    Instagram hashtags they don't want to keep.
+    Rebuilds the FTS index after the update — safe even if FTS was previously out of sync."""
     conn = get_db()
     try:
         if not conn.execute("SELECT id FROM recipes WHERE id = ?", (recipe_id,)).fetchone():
@@ -306,6 +298,9 @@ def update_recipe_tags(recipe_id: int, req: UpdateTagsRequest):
             "UPDATE recipes SET tags = ? WHERE id = ?",
             (json.dumps(req.tags), recipe_id),
         )
+        # Full rebuild keeps FTS consistent regardless of prior state.
+        # Safe for small vaults; revisit if recipe count grows large.
+        conn.execute("INSERT INTO recipes_fts(recipes_fts) VALUES('rebuild')")
         conn.commit()
         return {"tags": req.tags}
     finally:
