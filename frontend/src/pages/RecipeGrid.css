@@ -85,7 +85,7 @@
 }
 
 .add-btn:hover:not(:disabled) {
-  background: #b3522e;
+  background: #162d4a;
 }
 
 .add-btn:disabled {
@@ -451,7 +451,7 @@
 }
 
 .modal-add-btn:hover:not(:disabled) {
-  background: #4a8a5a;
+  background: #246080;
 }
 
 .modal-add-btn:disabled {
