@@ -390,7 +390,8 @@
   color: var(--ink-muted);
 }
 
-/* Mobile */
+/* ── Responsive ───────────────────────────────────────────── */
+
 @media (max-width: 700px) {
   .detail-inner {
     grid-template-columns: 1fr;
@@ -404,5 +405,60 @@
   .detail-topbar {
     flex-wrap: wrap;
     gap: 8px;
+    padding: 0.75rem 1rem;
+  }
+
+  .detail-actions {
+    width: 100%;
+    justify-content: flex-end;
+  }
+}
+
+@media (max-width: 480px) {
+  .detail-inner {
+    padding: 1.5rem 1rem;
+  }
+
+  .detail-title {
+    font-size: 1.35rem;
+  }
+
+  .back-btn,
+  .ig-link,
+  .delete-recipe-btn {
+    font-size: 0.82rem;
+    /* Larger tap target */
+    min-height: 36px;
+    display: inline-flex;
+    align-items: center;
+  }
+
+  /* Keep label picker from overflowing off the right edge on small screens */
+  .label-picker {
+    left: auto;
+    right: 0;
+  }
+
+  .caption-edit-actions {
+    flex-direction: column;
+  }
+
+  .caption-save-btn,
+  .caption-cancel-btn {
+    width: 100%;
+    text-align: center;
+    padding: 0.65rem;
+  }
+
+  .detail-labels {
+    gap: 5px;
+  }
+
+  .detail-label-chip,
+  .label-add-btn {
+    font-size: 0.78rem;
+    min-height: 34px;
+    display: inline-flex;
+    align-items: center;
   }
 }
