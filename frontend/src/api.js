@@ -76,6 +76,16 @@ export async function setRecipeLabels(recipeId, labelIds) {
   return res.json()
 }
 
+export async function updateRecipeCaption(recipeId, caption) {
+  const res = await fetch(`${BASE}/api/recipes/${recipeId}/caption`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ caption }),
+  })
+  if (!res.ok) throw new Error('Failed to save instructions')
+  return res.json()
+}
+
 export async function updateRecipeTags(recipeId, tags) {
   const res = await fetch(`${BASE}/api/recipes/${recipeId}/tags`, {
     method: 'PUT',

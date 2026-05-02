@@ -135,6 +135,9 @@ class SetRecipeLabelsRequest(BaseModel):
 class UpdateTagsRequest(BaseModel):
     tags: List[str]
 
+class UpdateCaptionRequest(BaseModel):
+    caption: str
+
 
 # --- Recipe endpoints ---
 
@@ -303,6 +306,24 @@ def update_recipe_tags(recipe_id: int, req: UpdateTagsRequest):
         conn.execute("INSERT INTO recipes_fts(recipes_fts) VALUES('rebuild')")
         conn.commit()
         return {"tags": req.tags}
+    finally:
+        conn.close()
+
+
+@app.patch("/api/recipes/{recipe_id}/caption")
+def update_recipe_caption(recipe_id: int, req: UpdateCaptionRequest):
+    """Update the instructions/caption text for a recipe after manual editing."""
+    conn = get_db()
+    try:
+        if not conn.execute("SELECT id FROM recipes WHERE id = ?", (recipe_id,)).fetchone():
+            raise HTTPException(status_code=404, detail="Recipe not found")
+        conn.execute(
+            "UPDATE recipes SET caption = ? WHERE id = ?",
+            (req.caption, recipe_id),
+        )
+        conn.execute("INSERT INTO recipes_fts(recipes_fts) VALUES('rebuild')")
+        conn.commit()
+        return {"caption": req.caption}
     finally:
         conn.close()
 

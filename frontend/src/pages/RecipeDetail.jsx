@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { fetchRecipe, deleteRecipe, fetchLabels, setRecipeLabels, updateRecipeTags, mediaUrl } from '../api.js'
+import { fetchRecipe, deleteRecipe, fetchLabels, setRecipeLabels, updateRecipeTags, updateRecipeCaption, mediaUrl } from '../api.js'
 import './RecipeDetail.css'
 
 export default function RecipeDetail({ id, onBack }) {
@@ -10,6 +10,9 @@ export default function RecipeDetail({ id, onBack }) {
   const [recipeLabels, setRecipeLabelsState] = useState([])
   const [showPicker, setShowPicker] = useState(false)
   const [recipeTags, setRecipeTags] = useState([])
+  const [editingCaption, setEditingCaption] = useState(false)
+  const [captionDraft, setCaptionDraft] = useState('')
+  const [savingCaption, setSavingCaption] = useState(false)
   const pickerRef = useRef(null)
 
   useEffect(() => {
@@ -44,6 +47,26 @@ export default function RecipeDetail({ id, onBack }) {
     const updated = await setRecipeLabels(id, newIds)
     setRecipeLabelsState(updated)
     setShowPicker(false)
+  }
+
+  function startEditCaption() {
+    setCaptionDraft(recipe.caption || '')
+    setEditingCaption(true)
+  }
+
+  function cancelEditCaption() {
+    setEditingCaption(false)
+  }
+
+  async function handleSaveCaption() {
+    setSavingCaption(true)
+    try {
+      await updateRecipeCaption(id, captionDraft)
+      setRecipe(r => ({ ...r, caption: captionDraft }))
+      setEditingCaption(false)
+    } finally {
+      setSavingCaption(false)
+    }
   }
 
   async function handleRemoveTag(tag) {
@@ -188,15 +211,35 @@ export default function RecipeDetail({ id, onBack }) {
           )}
 
           <div className="detail-caption-section">
-            <h2 className="caption-heading">Caption</h2>
-            {paragraphs.length > 0 ? (
+            <div className="caption-heading-row">
+              <h2 className="caption-heading">Instructions</h2>
+              {!editingCaption && (
+                <button className="caption-edit-btn" onClick={startEditCaption}>Edit</button>
+              )}
+            </div>
+            {editingCaption ? (
+              <div className="caption-edit">
+                <textarea
+                  className="caption-textarea"
+                  value={captionDraft}
+                  onChange={e => setCaptionDraft(e.target.value)}
+                  rows={12}
+                />
+                <div className="caption-edit-actions">
+                  <button className="caption-save-btn" onClick={handleSaveCaption} disabled={savingCaption}>
+                    {savingCaption ? 'Saving…' : 'Save'}
+                  </button>
+                  <button className="caption-cancel-btn" onClick={cancelEditCaption}>Cancel</button>
+                </div>
+              </div>
+            ) : paragraphs.length > 0 ? (
               <div className="caption-body">
                 {paragraphs.map((p, i) => (
                   <p key={i} className="caption-para">{p}</p>
                 ))}
               </div>
             ) : (
-              <p className="caption-empty">No caption available.</p>
+              <p className="caption-empty">No instructions yet.</p>
             )}
           </div>
         </div>

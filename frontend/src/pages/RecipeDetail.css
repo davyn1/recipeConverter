@@ -272,12 +272,93 @@
   padding-top: 1.5rem;
 }
 
+.caption-heading-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1rem;
+}
+
 .caption-heading {
   font-family: 'Lora', serif;
   font-size: 1rem;
   font-weight: 600;
   color: var(--ink);
-  margin-bottom: 1rem;
+  margin-bottom: 0;
+}
+
+.caption-edit-btn {
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--ink-muted);
+  font-size: 0.8rem;
+  padding: 3px 10px;
+  border-radius: 8px;
+  transition: border-color 0.15s, color 0.15s;
+}
+
+.caption-edit-btn:hover {
+  border-color: var(--ink-muted);
+  color: var(--ink);
+}
+
+.caption-textarea {
+  width: 100%;
+  padding: 0.75rem;
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius);
+  font-size: 0.92rem;
+  font-family: inherit;
+  color: var(--ink);
+  line-height: 1.7;
+  resize: vertical;
+  outline: none;
+  box-sizing: border-box;
+  transition: border-color 0.2s;
+}
+
+.caption-textarea:focus {
+  border-color: var(--terracotta);
+}
+
+.caption-edit-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.caption-save-btn {
+  padding: 0.5rem 1.2rem;
+  background: var(--terracotta);
+  color: white;
+  border: none;
+  border-radius: var(--radius);
+  font-size: 0.88rem;
+  font-weight: 500;
+  transition: background 0.15s, opacity 0.15s;
+}
+
+.caption-save-btn:hover:not(:disabled) {
+  background: #b3522e;
+}
+
+.caption-save-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.caption-cancel-btn {
+  padding: 0.5rem 1rem;
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--ink-muted);
+  border-radius: var(--radius);
+  font-size: 0.88rem;
+  transition: background 0.15s;
+}
+
+.caption-cancel-btn:hover {
+  background: var(--cream-dark);
 }
 
 .caption-body {
