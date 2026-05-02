@@ -7,18 +7,18 @@
 }
 
 :root {
-  --cream: #f8f4ed;
-  --cream-dark: #ede7d9;
-  --ink: #1a2035;
-  --ink-muted: #4a5370;
-  --ink-faint: #9aa0b4;
-  --terracotta: #1e3a5f;
-  --terracotta-light: #cdd9e8;
-  --sage: #2e6b8a;
-  --sage-light: #cce8f4;
-  --border: #ddd5c5;
-  --radius: 12px;
-  --shadow: 0 2px 16px rgba(26,32,53,0.10);
+  --cream: #faf6ef;
+  --cream-dark: #f0e8d9;
+  --ink: #2c1f14;
+  --ink-muted: #7a6555;
+  --ink-faint: #b8a898;
+  --terracotta: #d4622e;
+  --terracotta-light: #fae3d4;
+  --sage: #c47c2a;
+  --sage-light: #faebd4;
+  --border: #e5d8c5;
+  --radius: 16px;
+  --shadow: 0 4px 24px rgba(44,31,20,0.12);
 }
 
 html, body {
@@ -45,7 +45,7 @@ button {
   font-family: 'DM Sans', sans-serif;
 }
 
-input {
+input, textarea {
   font-family: 'DM Sans', sans-serif;
 }
 
