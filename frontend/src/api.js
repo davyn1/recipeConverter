@@ -1,4 +1,4 @@
-const BASE = 'http://localhost:8000'
+const BASE = ''
 
 export async function fetchRecipes(search = '', labelId = null) {
   const params = new URLSearchParams()
