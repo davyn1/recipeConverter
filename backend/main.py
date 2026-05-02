@@ -24,9 +24,12 @@ MEDIA_DIR = "media"
 os.makedirs(MEDIA_DIR, exist_ok=True)
 
 
+# --- Database helpers ---
+
 def get_db():
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
+    # Required per-connection — SQLite disables FK enforcement by default
     conn.execute("PRAGMA foreign_keys = ON")
     return conn
 
@@ -44,10 +47,11 @@ def init_db():
             post_date TEXT,
             video_path TEXT,
             thumbnail_path TEXT,
-            tags TEXT,
+            tags TEXT,           -- JSON array of Instagram hashtags
             created_at TEXT DEFAULT (datetime('now'))
         );
 
+        -- Full-text search index over the fields users are likely to search
         CREATE VIRTUAL TABLE IF NOT EXISTS recipes_fts
         USING fts5(
             title,
@@ -58,6 +62,7 @@ def init_db():
             content_rowid='id'
         );
 
+        -- Keep FTS in sync with the recipes table
         CREATE TRIGGER IF NOT EXISTS recipes_ai
         AFTER INSERT ON recipes BEGIN
             INSERT INTO recipes_fts(rowid, title, caption, author, tags)
@@ -70,12 +75,23 @@ def init_db():
             VALUES ('delete', old.id, old.title, old.caption, old.author, old.tags);
         END;
 
+        -- FTS5 content tables require a delete-then-insert to update a row
+        CREATE TRIGGER IF NOT EXISTS recipes_au
+        AFTER UPDATE ON recipes BEGIN
+            INSERT INTO recipes_fts(recipes_fts, rowid, title, caption, author, tags)
+            VALUES ('delete', old.id, old.title, old.caption, old.author, old.tags);
+            INSERT INTO recipes_fts(rowid, title, caption, author, tags)
+            VALUES (new.id, new.title, new.caption, new.author, new.tags);
+        END;
+
+        -- User-defined labels (e.g. "Asian", "Quick Meals") — separate from Instagram hashtags
         CREATE TABLE IF NOT EXISTS labels (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             name TEXT UNIQUE NOT NULL,
             created_at TEXT DEFAULT (datetime('now'))
         );
 
+        -- Many-to-many: a recipe can have multiple labels, a label can apply to many recipes
         CREATE TABLE IF NOT EXISTS recipe_labels (
             recipe_id INTEGER NOT NULL REFERENCES recipes(id) ON DELETE CASCADE,
             label_id INTEGER NOT NULL REFERENCES labels(id) ON DELETE CASCADE,
@@ -87,6 +103,10 @@ def init_db():
 
 
 def attach_labels(conn, recipes: list) -> list:
+    """Fetch labels for a batch of recipes and attach them in-place.
+
+    One query for the whole batch instead of N queries avoids the N+1 problem.
+    """
     if not recipes:
         return recipes
     ids = [r["id"] for r in recipes]
@@ -110,27 +130,27 @@ def attach_labels(conn, recipes: list) -> list:
 init_db()
 
 
+# --- Request models ---
+
 class AddRecipeRequest(BaseModel):
     url: str
-
-
-class RecipeStatus(BaseModel):
-    id: int
-    status: str
-    message: str
-
 
 class CreateLabelRequest(BaseModel):
     name: str
 
-
 class SetRecipeLabelsRequest(BaseModel):
     label_ids: List[int]
 
+class UpdateTagsRequest(BaseModel):
+    tags: List[str]
+
+
+# --- Recipe endpoints ---
 
 @app.post("/api/recipes")
 async def add_recipe(req: AddRecipeRequest, background_tasks: BackgroundTasks):
-    """Add a new recipe from an Instagram URL."""
+    """Enqueue a new recipe for download. Returns immediately with the new ID so
+    the frontend can start polling for status before the download finishes."""
     conn = get_db()
     try:
         existing = conn.execute(
@@ -139,7 +159,7 @@ async def add_recipe(req: AddRecipeRequest, background_tasks: BackgroundTasks):
         if existing:
             raise HTTPException(status_code=409, detail="Recipe already saved")
 
-        # Insert a placeholder row so the frontend can poll for status
+        # Placeholder row — title "Processing..." signals in-progress to the frontend
         cursor = conn.execute(
             "INSERT INTO recipes (instagram_url, title, caption) VALUES (?, ?, ?)",
             (req.url, "Processing...", "")
@@ -154,7 +174,8 @@ async def add_recipe(req: AddRecipeRequest, background_tasks: BackgroundTasks):
 
 
 def process_recipe(recipe_id: int, url: str):
-    """Background task: download video + extract metadata, update DB."""
+    """Background task: run the downloader and write results back to the DB.
+    On failure, the title is set to an error string so the frontend can surface it."""
     conn = get_db()
     try:
         data = extract_post_data(url, MEDIA_DIR)
@@ -193,6 +214,8 @@ def process_recipe(recipe_id: int, url: str):
 
 @app.get("/api/recipes")
 def list_recipes(search: str = "", label_id: Optional[int] = None, limit: int = 50, offset: int = 0):
+    """List recipes with optional full-text search and/or label filter.
+    Query is built dynamically so each filter only adds a JOIN when needed."""
     conn = get_db()
     try:
         params: list = []
@@ -222,6 +245,7 @@ def list_recipes(search: str = "", label_id: Optional[int] = None, limit: int = 
 
 @app.get("/api/recipes/{recipe_id}")
 def get_recipe(recipe_id: int):
+    """Get a single recipe by ID, including its user labels."""
     conn = get_db()
     try:
         row = conn.execute(
@@ -238,7 +262,6 @@ def get_recipe(recipe_id: int):
 
 @app.delete("/api/recipes/{recipe_id}")
 def delete_recipe(recipe_id: int):
-    """Delete a recipe."""
     conn = get_db()
     try:
         conn.execute("DELETE FROM recipes WHERE id = ?", (recipe_id,))
@@ -247,6 +270,49 @@ def delete_recipe(recipe_id: int):
     finally:
         conn.close()
 
+
+@app.get("/api/recipes/{recipe_id}/status")
+def get_recipe_status(recipe_id: int):
+    """Lightweight poll endpoint — the frontend calls this every 2.5s while a
+    recipe is downloading to know when it's ready without re-fetching full data."""
+    conn = get_db()
+    try:
+        row = conn.execute(
+            "SELECT id, title FROM recipes WHERE id = ?", (recipe_id,)
+        ).fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="Recipe not found")
+        title = row["title"]
+        is_processing = title == "Processing..."
+        is_error = title.startswith("Error:")
+        return {
+            "id": recipe_id,
+            "status": "processing" if is_processing else ("error" if is_error else "done"),
+            "title": title,
+        }
+    finally:
+        conn.close()
+
+
+@app.put("/api/recipes/{recipe_id}/tags")
+def update_recipe_tags(recipe_id: int, req: UpdateTagsRequest):
+    """Replace the hashtag list for a recipe. Used when the user removes individual
+    Instagram hashtags they don't want to keep."""
+    conn = get_db()
+    try:
+        if not conn.execute("SELECT id FROM recipes WHERE id = ?", (recipe_id,)).fetchone():
+            raise HTTPException(status_code=404, detail="Recipe not found")
+        conn.execute(
+            "UPDATE recipes SET tags = ? WHERE id = ?",
+            (json.dumps(req.tags), recipe_id),
+        )
+        conn.commit()
+        return {"tags": req.tags}
+    finally:
+        conn.close()
+
+
+# --- Label endpoints ---
 
 @app.get("/api/labels")
 def list_labels():
@@ -276,6 +342,7 @@ def create_label(req: CreateLabelRequest):
 
 @app.delete("/api/labels/{label_id}")
 def delete_label(label_id: int):
+    """Deleting a label cascades to recipe_labels via the FK constraint."""
     conn = get_db()
     try:
         conn.execute("DELETE FROM labels WHERE id = ?", (label_id,))
@@ -287,6 +354,8 @@ def delete_label(label_id: int):
 
 @app.put("/api/recipes/{recipe_id}/labels")
 def set_recipe_labels(recipe_id: int, req: SetRecipeLabelsRequest):
+    """Replace all labels on a recipe with the supplied set.
+    Delete-then-insert is simpler than diffing additions and removals."""
     conn = get_db()
     try:
         if not conn.execute("SELECT id FROM recipes WHERE id = ?", (recipe_id,)).fetchone():
@@ -309,29 +378,10 @@ def set_recipe_labels(recipe_id: int, req: SetRecipeLabelsRequest):
         conn.close()
 
 
-# Serve saved media files
-app.mount("/media", StaticFiles(directory=MEDIA_DIR), name="media")
+# --- Static files & health ---
 
-@app.get("/api/recipes/{recipe_id}/status")
-def get_recipe_status(recipe_id: int):
-    """Lightweight poll endpoint — returns processing status."""
-    conn = get_db()
-    try:
-        row = conn.execute(
-            "SELECT id, title FROM recipes WHERE id = ?", (recipe_id,)
-        ).fetchone()
-        if not row:
-            raise HTTPException(status_code=404, detail="Recipe not found")
-        title = row["title"]
-        is_processing = title == "Processing..."
-        is_error = title.startswith("Error:")
-        return {
-            "id": recipe_id,
-            "status": "processing" if is_processing else ("error" if is_error else "done"),
-            "title": title,
-        }
-    finally:
-        conn.close()
+# Serve downloaded videos and thumbnails from the media directory
+app.mount("/media", StaticFiles(directory=MEDIA_DIR), name="media")
 
 
 @app.get("/api/health")

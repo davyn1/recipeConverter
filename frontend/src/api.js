@@ -75,3 +75,13 @@ export async function setRecipeLabels(recipeId, labelIds) {
   if (!res.ok) throw new Error('Failed to update labels')
   return res.json()
 }
+
+export async function updateRecipeTags(recipeId, tags) {
+  const res = await fetch(`${BASE}/api/recipes/${recipeId}/tags`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ tags }),
+  })
+  if (!res.ok) throw new Error('Failed to update tags')
+  return res.json()
+}

@@ -230,6 +230,34 @@
   margin-bottom: 1.5rem;
 }
 
+/* Removable hashtag chips — only shown on the detail page */
+.tag-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.78rem;
+  background: var(--terracotta-light);
+  color: var(--terracotta);
+  padding: 3px 8px 3px 10px;
+  border-radius: 20px;
+  font-weight: 500;
+}
+
+.tag-chip-remove {
+  background: none;
+  border: none;
+  color: var(--terracotta);
+  font-size: 1rem;
+  line-height: 1;
+  padding: 0;
+  opacity: 0.5;
+  transition: opacity 0.15s;
+}
+
+.tag-chip-remove:hover {
+  opacity: 1;
+}
+
 .tag {
   font-size: 0.78rem;
   background: var(--terracotta-light);

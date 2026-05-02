@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { fetchRecipe, deleteRecipe, fetchLabels, setRecipeLabels, mediaUrl } from '../api.js'
+import { fetchRecipe, deleteRecipe, fetchLabels, setRecipeLabels, updateRecipeTags, mediaUrl } from '../api.js'
 import './RecipeDetail.css'
 
 export default function RecipeDetail({ id, onBack }) {
@@ -9,11 +9,16 @@ export default function RecipeDetail({ id, onBack }) {
   const [allLabels, setAllLabels] = useState([])
   const [recipeLabels, setRecipeLabelsState] = useState([])
   const [showPicker, setShowPicker] = useState(false)
+  const [recipeTags, setRecipeTags] = useState([])
   const pickerRef = useRef(null)
 
   useEffect(() => {
     fetchRecipe(id)
-      .then(r => { setRecipe(r); setRecipeLabelsState(r.labels || []) })
+      .then(r => {
+        setRecipe(r)
+        setRecipeLabelsState(r.labels || [])
+        setRecipeTags(r.tags ? JSON.parse(r.tags) : [])
+      })
       .catch(e => setError(e.message))
       .finally(() => setLoading(false))
     fetchLabels().then(setAllLabels).catch(() => {})
@@ -41,6 +46,12 @@ export default function RecipeDetail({ id, onBack }) {
     setShowPicker(false)
   }
 
+  async function handleRemoveTag(tag) {
+    const newTags = recipeTags.filter(t => t !== tag)
+    await updateRecipeTags(id, newTags)
+    setRecipeTags(newTags)
+  }
+
   async function handleDelete() {
     if (!confirm('Remove this recipe from your vault?')) return
     await deleteRecipe(id)
@@ -54,11 +65,6 @@ export default function RecipeDetail({ id, onBack }) {
         weekday: 'long', month: 'long', day: 'numeric', year: 'numeric'
       })
     } catch { return '' }
-  }
-
-  function parseTags(raw) {
-    if (!raw) return []
-    try { return JSON.parse(raw) } catch { return [] }
   }
 
   function formatCaption(caption) {
@@ -80,7 +86,6 @@ export default function RecipeDetail({ id, onBack }) {
     </div>
   )
 
-  const tags = parseTags(recipe.tags)
   const paragraphs = formatCaption(recipe.caption)
   const videoSrc = mediaUrl(recipe.video_path)
   const thumbSrc = mediaUrl(recipe.thumbnail_path)
@@ -167,9 +172,18 @@ export default function RecipeDetail({ id, onBack }) {
             </div>
           </div>
 
-          {tags.length > 0 && (
+          {recipeTags.length > 0 && (
             <div className="detail-tags">
-              {tags.map(t => <span key={t} className="tag">#{t}</span>)}
+              {recipeTags.map(t => (
+                <span key={t} className="tag-chip">
+                  #{t}
+                  <button
+                    className="tag-chip-remove"
+                    onClick={() => handleRemoveTag(t)}
+                    title="Remove hashtag"
+                  >×</button>
+                </span>
+              ))}
             </div>
           )}
 
