@@ -47,8 +47,9 @@ Then open [http://localhost:5173](http://localhost:5173) in your browser.
 
 ## Planned Features
 
-- [ ] Tag/hashtag filtering
-- [ ] Delete recipes from the grid
+- [x] Tag/hashtag filtering
+- [x] Delete recipes from the grid
 - [ ] Support for private posts via Instagram login session
 - [ ] Export recipes to PDF or notes
 - [ ] Mobile-friendly layout
+- [ ] Hosting (long-term)
