@@ -17,6 +17,8 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    # Expose range headers so the browser can seek cross-origin videos
+    expose_headers=["Content-Range", "Accept-Ranges", "Content-Length"],
 )
 
 DB_PATH = "recipevault.db"
