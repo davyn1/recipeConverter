@@ -4,6 +4,7 @@
   box-sizing: border-box;
   margin: 0;
   padding: 0;
+  cursor: url('/cursor-default.svg') 9 22, default;
 }
 
 :root {
@@ -38,15 +39,29 @@ h1, h2, h3 {
 a {
   color: inherit;
   text-decoration: none;
+  cursor: url('/cursor-default.svg') 5 5, pointer;
 }
 
 button {
-  cursor: pointer;
+  cursor: url('/cursor-default.svg') 5 5, pointer;
   font-family: 'DM Sans', sans-serif;
 }
 
 input, textarea {
   font-family: 'DM Sans', sans-serif;
+}
+
+input[type="text"],
+input[type="search"],
+input[type="url"],
+textarea {
+  cursor: text;
+}
+
+/* Click animation — JS toggles this class on mousedown/mouseup */
+body.is-clicking,
+body.is-clicking * {
+  cursor: url('/cursor-click.svg') 9 22, default !important;
 }
 
 ::-webkit-scrollbar {

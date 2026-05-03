@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">
+  <!-- Back chopstick shadow, then fill -->
+  <line x1="27" y1="5" x2="5" y2="17" stroke="#6b3d10" stroke-width="4" stroke-linecap="round"/>
+  <line x1="27" y1="5" x2="5" y2="17" stroke="#d4a860" stroke-width="2.5" stroke-linecap="round"/>
+  <!-- Front chopstick shadow, then fill -->
+  <line x1="25" y1="6" x2="13" y2="27" stroke="#6b3d10" stroke-width="4" stroke-linecap="round"/>
+  <line x1="25" y1="6" x2="13" y2="27" stroke="#b87840" stroke-width="2.5" stroke-linecap="round"/>
+</svg>
