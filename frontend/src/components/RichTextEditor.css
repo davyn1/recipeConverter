@@ -1,0 +1,85 @@
+.rte-wrapper {
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius);
+  background: white;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.rte-wrapper:focus-within {
+  border-color: var(--terracotta);
+  box-shadow: 0 0 0 3px rgba(212, 98, 46, 0.10);
+}
+
+.rte-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--border);
+  background: var(--cream-dark);
+  border-radius: var(--radius) var(--radius) 0 0;
+}
+
+.rte-btn {
+  background: none;
+  border: none;
+  border-radius: 6px;
+  padding: 4px 7px;
+  font-size: 0.85rem;
+  font-family: inherit;
+  color: var(--ink-muted);
+  line-height: 1;
+  min-width: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.12s, color 0.12s;
+}
+
+.rte-btn:hover {
+  background: var(--border);
+  color: var(--ink);
+}
+
+.rte-btn.is-active {
+  background: var(--terracotta-light);
+  color: var(--terracotta);
+}
+
+.rte-divider {
+  width: 1px;
+  height: 18px;
+  background: var(--border);
+  margin: 0 4px;
+  flex-shrink: 0;
+}
+
+.rte-content {
+  padding: 0.75rem 1rem;
+}
+
+.rte-content .ProseMirror {
+  outline: none;
+  min-height: 180px;
+  font-size: 0.92rem;
+  color: var(--ink);
+  line-height: 1.7;
+}
+
+.rte-content .ProseMirror p {
+  margin: 0 0 0.4rem 0;
+}
+
+.rte-content .ProseMirror ul,
+.rte-content .ProseMirror ol {
+  padding-left: 1.4rem;
+  margin: 0 0 0.4rem 0;
+}
+
+.rte-content .ProseMirror li {
+  margin-bottom: 0.15rem;
+}
+
+.rte-content .ProseMirror li p {
+  margin: 0;
+}

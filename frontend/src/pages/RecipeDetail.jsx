@@ -1,6 +1,18 @@
 import { useState, useEffect, useRef } from 'react'
-import { fetchRecipe, deleteRecipe, fetchLabels, setRecipeLabels, updateRecipeTags, updateRecipeCaption, mediaUrl } from '../api.js'
+import { fetchRecipe, deleteRecipe, fetchLabels, createLabel, setRecipeLabels, updateRecipeTitle, updateRecipeCaption, mediaUrl } from '../api.js'
+import RichTextEditor from '../components/RichTextEditor.jsx'
 import './RecipeDetail.css'
+
+function toHTML(text) {
+  if (!text) return ''
+  if (text.trimStart().startsWith('<')) return text
+  return text.split('\n')
+    .map(line => {
+      const escaped = line.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      return `<p>${escaped || '<br>'}</p>`
+    })
+    .join('')
+}
 
 export default function RecipeDetail({ id, onBack }) {
   const [recipe, setRecipe] = useState(null)
@@ -8,8 +20,11 @@ export default function RecipeDetail({ id, onBack }) {
   const [error, setError] = useState('')
   const [allLabels, setAllLabels] = useState([])
   const [recipeLabels, setRecipeLabelsState] = useState([])
+  const [editingTitle, setEditingTitle] = useState(false)
+  const [titleDraft, setTitleDraft] = useState('')
   const [showPicker, setShowPicker] = useState(false)
-  const [recipeTags, setRecipeTags] = useState([])
+  const [newLabelInput, setNewLabelInput] = useState('')
+  const [creatingLabel, setCreatingLabel] = useState(false)
   const [editingCaption, setEditingCaption] = useState(false)
   const [captionDraft, setCaptionDraft] = useState('')
   const [savingCaption, setSavingCaption] = useState(false)
@@ -20,7 +35,6 @@ export default function RecipeDetail({ id, onBack }) {
       .then(r => {
         setRecipe(r)
         setRecipeLabelsState(r.labels || [])
-        setRecipeTags(r.tags ? JSON.parse(r.tags) : [])
       })
       .catch(e => setError(e.message))
       .finally(() => setLoading(false))
@@ -36,6 +50,19 @@ export default function RecipeDetail({ id, onBack }) {
     return () => document.removeEventListener('mousedown', handleClick)
   }, [showPicker])
 
+  async function handleSaveTitle() {
+    const trimmed = titleDraft.trim()
+    if (!trimmed || trimmed === recipe.title) { setEditingTitle(false); return }
+    await updateRecipeTitle(id, trimmed)
+    setRecipe(r => ({ ...r, title: trimmed }))
+    setEditingTitle(false)
+  }
+
+  function handleTitleKeyDown(e) {
+    if (e.key === 'Enter') { e.preventDefault(); handleSaveTitle() }
+    if (e.key === 'Escape') { e.preventDefault(); setEditingTitle(false) }
+  }
+
   async function handleRemoveLabel(labelId) {
     const newIds = recipeLabels.filter(l => l.id !== labelId).map(l => l.id)
     const updated = await setRecipeLabels(id, newIds)
@@ -49,8 +76,28 @@ export default function RecipeDetail({ id, onBack }) {
     setShowPicker(false)
   }
 
+  async function handleCreateLabel(e) {
+    e.preventDefault()
+    const name = newLabelInput.trim()
+    if (!name) return
+    setCreatingLabel(true)
+    try {
+      const created = await createLabel(name)
+      const newIds = [...recipeLabels.map(l => l.id), created.id]
+      const updated = await setRecipeLabels(id, newIds)
+      setRecipeLabelsState(updated)
+      setAllLabels(prev => [...prev, created].sort((a, b) => a.name.localeCompare(b.name)))
+      setNewLabelInput('')
+      setShowPicker(false)
+    } catch {
+      // duplicate label names are rejected by the server — silently ignore
+    } finally {
+      setCreatingLabel(false)
+    }
+  }
+
   function startEditCaption() {
-    setCaptionDraft(recipe.caption || '')
+    setCaptionDraft(toHTML(recipe.caption || ''))
     setEditingCaption(true)
   }
 
@@ -67,12 +114,6 @@ export default function RecipeDetail({ id, onBack }) {
     } finally {
       setSavingCaption(false)
     }
-  }
-
-  async function handleRemoveTag(tag) {
-    const newTags = recipeTags.filter(t => t !== tag)
-    await updateRecipeTags(id, newTags)
-    setRecipeTags(newTags)
   }
 
   async function handleDelete() {
@@ -150,7 +191,27 @@ export default function RecipeDetail({ id, onBack }) {
 
         <div className="detail-info">
           <p className="detail-author">@{recipe.author}</p>
-          <h1 className="detail-title">{recipe.title}</h1>
+          {editingTitle ? (
+            <textarea
+              className="detail-title-input"
+              value={titleDraft}
+              rows={1}
+              onChange={e => {
+                setTitleDraft(e.target.value)
+                e.target.style.height = 'auto'
+                e.target.style.height = e.target.scrollHeight + 'px'
+              }}
+              onBlur={handleSaveTitle}
+              onKeyDown={handleTitleKeyDown}
+              autoFocus
+            />
+          ) : (
+            <h1
+              className="detail-title detail-title-editable"
+              onClick={() => { setTitleDraft(recipe.title); setEditingTitle(true) }}
+              title="Click to edit title"
+            >{recipe.title}</h1>
+          )}
           <p className="detail-date">{formatDate(recipe.post_date)}</p>
 
           {/* User labels */}
@@ -166,49 +227,47 @@ export default function RecipeDetail({ id, onBack }) {
                   >×</button>
                 </span>
               ))}
-              {allLabels.length > 0 && unassigned.length > 0 && (
-                <div className="label-add-wrapper" ref={pickerRef}>
-                  <button
-                    className="label-add-btn"
-                    onClick={() => setShowPicker(v => !v)}
-                  >
-                    + Add
-                  </button>
-                  {showPicker && (
-                    <div className="label-picker">
-                      {unassigned.map(l => (
-                        <button
-                          key={l.id}
-                          className="label-picker-item"
-                          onClick={() => handleAddLabel(l)}
-                        >
-                          {l.name}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
-              {allLabels.length === 0 && (
-                <span className="labels-hint">Create labels from the vault to organise recipes.</span>
-              )}
+              <div className="label-add-wrapper" ref={pickerRef}>
+                <button
+                  className="label-add-btn"
+                  onClick={() => setShowPicker(v => !v)}
+                >
+                  + Add
+                </button>
+                {showPicker && (
+                  <div className="label-picker">
+                    {unassigned.map(l => (
+                      <button
+                        key={l.id}
+                        className="label-picker-item"
+                        onClick={() => handleAddLabel(l)}
+                      >
+                        {l.name}
+                      </button>
+                    ))}
+                    {unassigned.length > 0 && <div className="label-picker-divider" />}
+                    <form className="label-picker-new" onSubmit={handleCreateLabel}>
+                      <input
+                        className="label-picker-input"
+                        type="text"
+                        placeholder="New label…"
+                        value={newLabelInput}
+                        onChange={e => setNewLabelInput(e.target.value)}
+                        autoFocus={unassigned.length === 0}
+                      />
+                      <button
+                        type="submit"
+                        className="label-picker-create-btn"
+                        disabled={!newLabelInput.trim() || creatingLabel}
+                      >
+                        {creatingLabel ? '…' : 'Create'}
+                      </button>
+                    </form>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
-
-          {recipeTags.length > 0 && (
-            <div className="detail-tags">
-              {recipeTags.map(t => (
-                <span key={t} className="tag-chip">
-                  #{t}
-                  <button
-                    className="tag-chip-remove"
-                    onClick={() => handleRemoveTag(t)}
-                    title="Remove hashtag"
-                  >×</button>
-                </span>
-              ))}
-            </div>
-          )}
 
           <div className="detail-caption-section">
             <div className="caption-heading-row">
@@ -219,12 +278,7 @@ export default function RecipeDetail({ id, onBack }) {
             </div>
             {editingCaption ? (
               <div className="caption-edit">
-                <textarea
-                  className="caption-textarea"
-                  value={captionDraft}
-                  onChange={e => setCaptionDraft(e.target.value)}
-                  rows={12}
-                />
+                <RichTextEditor content={captionDraft} onChange={setCaptionDraft} />
                 <div className="caption-edit-actions">
                   <button className="caption-save-btn" onClick={handleSaveCaption} disabled={savingCaption}>
                     {savingCaption ? 'Saving…' : 'Save'}
@@ -232,12 +286,8 @@ export default function RecipeDetail({ id, onBack }) {
                   <button className="caption-cancel-btn" onClick={cancelEditCaption}>Cancel</button>
                 </div>
               </div>
-            ) : paragraphs.length > 0 ? (
-              <div className="caption-body">
-                {paragraphs.map((p, i) => (
-                  <p key={i} className="caption-para">{p}</p>
-                ))}
-              </div>
+            ) : recipe.caption ? (
+              <div className="caption-body caption-html" dangerouslySetInnerHTML={{ __html: toHTML(recipe.caption) }} />
             ) : (
               <p className="caption-empty">No instructions yet.</p>
             )}

@@ -41,10 +41,6 @@ def extract_shortcode(url: str) -> str:
     return match.group(1)
 
 
-def extract_hashtags(caption: str) -> list[str]:
-    """Pull hashtags out of a caption string."""
-    return re.findall(r"#(\w+)", caption or "")
-
 
 def infer_title(caption: str, author: str) -> str:
     """Make a readable title from the first line of a caption."""
@@ -182,7 +178,7 @@ def extract_post_data(instagram_url: str, media_dir: str) -> dict:
 
     caption = post.caption or ""
     author = post.owner_username or "unknown"
-    tags = extract_hashtags(caption)
+
     title = infer_title(caption, author)
     post_date = (
         post.date_utc.isoformat() if post.date_utc else datetime.utcnow().isoformat()
@@ -207,5 +203,4 @@ def extract_post_data(instagram_url: str, media_dir: str) -> dict:
         "post_date": post_date,
         "video_path": video_path,
         "thumbnail_path": thumbnail_path,
-        "tags": tags,
     }

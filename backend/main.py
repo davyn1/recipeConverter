@@ -8,7 +8,6 @@ import mimetypes
 import re
 import sqlite3
 import os
-import json
 from downloader import extract_post_data
 
 app = FastAPI(title="RecipeVault API")
@@ -136,8 +135,9 @@ class CreateLabelRequest(BaseModel):
 class SetRecipeLabelsRequest(BaseModel):
     label_ids: List[int]
 
-class UpdateTagsRequest(BaseModel):
-    tags: List[str]
+
+class UpdateTitleRequest(BaseModel):
+    title: str
 
 class UpdateCaptionRequest(BaseModel):
     caption: str
@@ -185,8 +185,7 @@ def process_recipe(recipe_id: int, url: str):
                 author = ?,
                 post_date = ?,
                 video_path = ?,
-                thumbnail_path = ?,
-                tags = ?
+                thumbnail_path = ?
             WHERE id = ?
         """, (
             data.get("shortcode"),
@@ -196,7 +195,6 @@ def process_recipe(recipe_id: int, url: str):
             data.get("post_date", ""),
             data.get("video_path"),
             data.get("thumbnail_path"),
-            json.dumps(data.get("tags", [])),
             recipe_id
         ))
         conn.commit()
@@ -292,24 +290,20 @@ def get_recipe_status(recipe_id: int):
         conn.close()
 
 
-@app.put("/api/recipes/{recipe_id}/tags")
-def update_recipe_tags(recipe_id: int, req: UpdateTagsRequest):
-    """Replace the hashtag list for a recipe. Used when the user removes individual
-    Instagram hashtags they don't want to keep.
-    Rebuilds the FTS index after the update — safe even if FTS was previously out of sync."""
+
+@app.patch("/api/recipes/{recipe_id}/title")
+def update_recipe_title(recipe_id: int, req: UpdateTitleRequest):
+    title = req.title.strip()
+    if not title:
+        raise HTTPException(status_code=400, detail="Title cannot be empty")
     conn = get_db()
     try:
         if not conn.execute("SELECT id FROM recipes WHERE id = ?", (recipe_id,)).fetchone():
             raise HTTPException(status_code=404, detail="Recipe not found")
-        conn.execute(
-            "UPDATE recipes SET tags = ? WHERE id = ?",
-            (json.dumps(req.tags), recipe_id),
-        )
-        # Full rebuild keeps FTS consistent regardless of prior state.
-        # Safe for small vaults; revisit if recipe count grows large.
+        conn.execute("UPDATE recipes SET title = ? WHERE id = ?", (title, recipe_id))
         conn.execute("INSERT INTO recipes_fts(recipes_fts) VALUES('rebuild')")
         conn.commit()
-        return {"tags": req.tags}
+        return {"title": title}
     finally:
         conn.close()
 

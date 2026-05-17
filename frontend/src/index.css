@@ -4,7 +4,7 @@
   box-sizing: border-box;
   margin: 0;
   padding: 0;
-  cursor: url('/cursor-default.svg') 9 22, default;
+  cursor: url('/cursor-default.svg') 5 5, default;
 }
 
 :root {
@@ -58,11 +58,6 @@ textarea {
   cursor: text;
 }
 
-/* Click animation — JS toggles this class on mousedown/mouseup */
-body.is-clicking,
-body.is-clicking * {
-  cursor: url('/cursor-click.svg') 9 22, default !important;
-}
 
 ::-webkit-scrollbar {
   width: 6px;

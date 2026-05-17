@@ -257,6 +257,11 @@
   border-color: #f5c6cb;
 }
 
+.recipe-card.errored .delete-btn {
+  opacity: 1;
+  background: rgba(192, 57, 43, 0.7);
+}
+
 .card-thumb {
   position: relative;
   aspect-ratio: 1;

@@ -1,8 +1,29 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">
-  <!-- Back chopstick shadow, then fill -->
-  <line x1="27" y1="5" x2="5" y2="17" stroke="#6b3d10" stroke-width="4" stroke-linecap="round"/>
-  <line x1="27" y1="5" x2="5" y2="17" stroke="#d4a860" stroke-width="2.5" stroke-linecap="round"/>
-  <!-- Front chopstick shadow, then fill -->
-  <line x1="25" y1="6" x2="13" y2="27" stroke="#6b3d10" stroke-width="4" stroke-linecap="round"/>
-  <line x1="25" y1="6" x2="13" y2="27" stroke="#b87840" stroke-width="2.5" stroke-linecap="round"/>
+  <g transform="rotate(-45 14 15)">
+    <!-- Tine shadows (close together) -->
+    <line x1="11" y1="3" x2="11" y2="13" stroke="#777" stroke-width="2"   stroke-linecap="round"/>
+    <line x1="13" y1="3" x2="13" y2="13" stroke="#777" stroke-width="2"   stroke-linecap="round"/>
+    <line x1="15" y1="3" x2="15" y2="13" stroke="#777" stroke-width="2"   stroke-linecap="round"/>
+    <line x1="17" y1="3" x2="17" y2="13" stroke="#777" stroke-width="2"   stroke-linecap="round"/>
+    <!-- Curved shoulder shadow (where tines meet shank) -->
+    <ellipse cx="14" cy="13" rx="4.5" ry="2.5" fill="#777"/>
+    <!-- Shank shadow -->
+    <line x1="14" y1="12" x2="14" y2="20" stroke="#777" stroke-width="3.5" stroke-linecap="round"/>
+    <!-- Handle shadow -->
+    <line x1="14" y1="19" x2="14" y2="30" stroke="#777" stroke-width="4.5" stroke-linecap="round"/>
+
+    <!-- Tine fills -->
+    <line x1="11" y1="3" x2="11" y2="13" stroke="#e4e4e4" stroke-width="1"   stroke-linecap="round"/>
+    <line x1="13" y1="3" x2="13" y2="13" stroke="#e4e4e4" stroke-width="1"   stroke-linecap="round"/>
+    <line x1="15" y1="3" x2="15" y2="13" stroke="#e4e4e4" stroke-width="1"   stroke-linecap="round"/>
+    <line x1="17" y1="3" x2="17" y2="13" stroke="#e4e4e4" stroke-width="1"   stroke-linecap="round"/>
+    <!-- Curved shoulder fill -->
+    <ellipse cx="14" cy="13" rx="3.5" ry="2" fill="#d0d0d0"/>
+    <!-- Shank fill -->
+    <line x1="14" y1="12" x2="14" y2="20" stroke="#d0d0d0" stroke-width="2.5" stroke-linecap="round"/>
+    <!-- Handle fill -->
+    <line x1="14" y1="19" x2="14" y2="30" stroke="#d8d8d8" stroke-width="3"   stroke-linecap="round"/>
+    <!-- Handle centre highlight -->
+    <line x1="14" y1="20" x2="14" y2="29" stroke="#f2f2f2" stroke-width="0.8" stroke-linecap="round"/>
+  </g>
 </svg>
